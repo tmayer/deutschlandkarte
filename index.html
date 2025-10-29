@@ -280,17 +280,17 @@
     <div id="overlay"></div>
 
     <div class="control-bar">
-      <button id="home-btn" type="button">Back to States</button>
-      <button id="back-btn" type="button">Step Back</button>
+      <button id="home-btn" type="button">Home</button>
+      <button id="back-btn" type="button">Zurück</button>
       <span class="status-pill">
-        <span id="level-label">States of Germany</span>
+        <span id="level-label">Bundesländer</span>
         <span id="count-label"></span>
       </span>
     </div>
 
     <div class="info-panel" id="info-panel">
-      <strong id="info-title">States of Germany</strong>
-      <span id="info-detail">Tap a state to explore its counties.</span>
+      <strong id="info-title">Bundesländer</strong>
+      <span id="info-detail">Klicke auf ein Land</span>
     </div>
 
     <div class="loading hidden" id="loading">
@@ -305,22 +305,22 @@
     const LEVELS = {
       states: {
         file: "topojson/germany_states.json",
-        label: "States of Germany",
-        instruction: "Tap a state to explore its counties.",
+        label: "Bundesländer",
+        instruction: "Klicke auf ein Land, um die Stadt-/Landkreise anzuzeigen",
         next: "counties",
         prefixLength: 2,
       },
       counties: {
         file: "topojson/germany_counties.json",
-        label: "Counties",
-        instruction: "Tap a county to explore its municipalities.",
+        label: "Stadt-/Landkreise",
+        instruction: "Klicke auf einen Kreis, um die Gemeinden anzuzeigen",
         next: "municipalities",
         prefixLength: 5,
       },
       municipalities: {
         file: "topojson/germany_municipalities.json",
-        label: "Municipalities",
-        instruction: "Click a municipality for metadata. Use Step Back to exit.",
+        label: "Gemeinden",
+        instruction: "Klicke zurück, um eine Ebene höher zu kommen",
         next: null,
         prefixLength: 12,
       },
@@ -509,7 +509,7 @@
     function updateUI(view, count) {
       const meta = LEVELS[view.level];
       levelLabel.textContent = `${meta.label}${view.name && view.name !== "Germany" ? ` · ${view.name}` : ""}`;
-      countLabel.textContent = `${count.toLocaleString()} ${count === 1 ? "feature" : "features"}`;
+      countLabel.textContent = `${count.toLocaleString()} ${count === 1 ? "Einheit" : "Einheiten"}`;
       infoTitle.textContent = meta.label;
       infoDetail.textContent = meta.instruction;
       backBtn.disabled = view.level === "states" && history.length === 0;
