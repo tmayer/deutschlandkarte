@@ -80,6 +80,11 @@
       stroke: var(--text-primary);
     }
 
+    svg.overlay .feature.selected.municipality-level {
+      fill: rgba(248, 113, 113, 0.35);
+      stroke: #fecaca;
+    }
+
     svg.overlay .germany-mask {
       fill: rgba(15, 23, 42, 0.55);
       pointer-events: none;
@@ -509,6 +514,7 @@
 
     function drawFeatures(features) {
       const key = (d) => codeFor(d);
+      const isMunicipalityLevel = currentView.level === "municipalities";
 
       const paths = featureLayer.selectAll("path").data(features, key);
 
@@ -522,7 +528,8 @@
       pathsEnter
         .merge(paths)
         .attr("d", path)
-        .classed("selected", (d) => activeCode && codeFor(d) === activeCode)
+        .classed("selected", (d) => codeFor(d) === activeCode)
+        .classed("municipality-level", isMunicipalityLevel)
         .on("click", (event, feature) => {
           event.stopPropagation();
           handleFeatureClick(feature);
@@ -655,7 +662,8 @@
       featureLayer
         .selectAll("path")
         .attr("d", path)
-        .classed("selected", (d) => activeCode && codeFor(d) === activeCode);
+        .classed("selected", (d) => codeFor(d) === activeCode)
+        .classed("municipality-level", currentView.level === "municipalities");
 
       const zoom = map.getZoom();
 
@@ -690,22 +698,20 @@
       const code = codeFor(feature);
       const name = nameFor(feature);
 
-      if (!nextLevel && activeCode === code) {
+      if (!nextLevel) {
+        const previousCode = activeCode;
+        activeCode = code;
         infoTitle.textContent = name;
         infoDetail.textContent = `Administrative code: ${code}`;
+        if (previousCode && previousCode !== code) {
+          highlightFeature(previousCode, false);
+        }
         highlightFeature(code, true);
         syncOverlay();
         return;
       }
 
       activeCode = code;
-
-      if (!nextLevel) {
-        infoTitle.textContent = name;
-        infoDetail.textContent = `Administrative code: ${code}`;
-        syncOverlay();
-        return;
-      }
 
       history.push({ ...currentView });
 
