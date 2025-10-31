@@ -58,7 +58,7 @@
     svg.overlay {
       position: absolute;
       overflow: visible;
-      pointer-events: auto;
+      pointer-events: none;
     }
 
     svg.overlay .feature {
@@ -372,6 +372,9 @@
 
     const controlBar = document.querySelector(".control-bar");
     let labelsVisible = true;
+    let isUserDraggingMap = false;
+    let dragEndedAt = 0;
+    const DRAG_CLICK_THRESHOLD = 250; // milliseconds to treat a recent drag as non-click
 
     const labelToggle = document.createElement("div");
     labelToggle.className = "label-toggle";
@@ -406,6 +409,13 @@
     let germanyMaskFeature = null;
 
     map.on("move zoom moveend zoomend viewreset", () => window.requestAnimationFrame(syncOverlay));
+    map.on("dragstart", () => {
+      isUserDraggingMap = true;
+    });
+    map.on("dragend", () => {
+      dragEndedAt = performance.now();
+      isUserDraggingMap = false;
+    });
     window.addEventListener("resize", () => {
       map.invalidateSize();
       syncOverlay();
@@ -426,15 +436,6 @@
       activeCode = null;
       currentView = history.pop();
       loadView(currentView, { skipHistory: true });
-    });
-
-    svg.on("click", (event) => {
-      if (event.target === svg.node()) {
-        restoreLevelInfo();
-        if (currentView.level !== "states") {
-          backBtn.click();
-        }
-      }
     });
 
     function codeFor(feature) {
@@ -696,6 +697,10 @@
     }
 
     function handleFeatureClick(feature) {
+      const now = performance.now();
+      if (isUserDraggingMap || (dragEndedAt && now - dragEndedAt < DRAG_CLICK_THRESHOLD)) {
+        return;
+      }
       const meta = LEVELS[currentView.level];
       const nextLevel = meta.next;
       const code = codeFor(feature);
