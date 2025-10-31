@@ -105,88 +105,23 @@
       opacity: 0;
     }
 
-    .control-bar {
-      position: absolute;
-      top: 0.75rem;
-      left: 50%;
-      transform: translateX(-50%);
+    .custom-map-controls .leaflet-control-button {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      padding: 0.45rem 0.65rem;
-      border-radius: 999px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.35);
-      z-index: 1100;
-    }
-
-    .control-bar button {
-      appearance: none;
-      border: 1px solid transparent;
-      background: rgba(30, 41, 59, 0.78);
-      color: var(--text-secondary);
-      font-size: 0.85rem;
+      justify-content: center;
+      font-size: 1.05rem;
       font-weight: 600;
-      padding: 0.3rem 0.9rem;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      color: #0f172a;
     }
 
-    .control-bar button:hover:not(:disabled) {
-      background: rgba(56, 189, 248, 0.25);
-      border-color: rgba(56, 189, 248, 0.6);
-      color: var(--text-primary);
+    .custom-map-controls .leaflet-control-button.toggle-active {
+      background: rgba(148, 163, 184, 0.25);
+      color: #1e293b;
     }
 
-    .control-bar button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .label-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.2rem 0.6rem;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.55);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      font-size: 0.85rem;
-    }
-
-    .label-toggle span {
-      color: var(--text-primary);
-      font-weight: 600;
-      margin-right: 0.2rem;
-    }
-
-    .label-toggle label {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      cursor: pointer;
-    }
-
-    .label-toggle input[type="radio"] {
-      accent-color: var(--accent);
-    }
-
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.35rem 0.85rem;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.65);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      white-space: nowrap;
-      font-size: 0.88rem;
+    .custom-map-controls .leaflet-control-button.leaflet-disabled {
+      color: rgba(15, 23, 42, 0.35);
+      pointer-events: none;
     }
 
     .info-panel {
@@ -215,6 +150,12 @@
       color: var(--text-secondary);
       font-size: 0.85rem;
       line-height: 1.4;
+    }
+
+    .info-panel .info-count {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      opacity: 0.85;
     }
 
     .loading {
@@ -249,25 +190,6 @@
     }
 
     @media (max-width: 640px) {
-      .control-bar {
-        top: 0.5rem;
-        padding: 0.25rem 0.45rem;
-        gap: 0.35rem;
-        left: 50%;
-        transform: translateX(-50%);
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28);
-      }
-
-      .control-bar button {
-        font-size: 0.72rem;
-        padding: 0.25rem 0.55rem;
-        border-radius: 12px;
-      }
-
-      .status-pill {
-        display: none;
-      }
-
       .info-panel {
         display: none;
       }
@@ -279,18 +201,10 @@
     <div id="map" role="application" aria-label="Drilldown map of Germany"></div>
     <div id="overlay"></div>
 
-    <div class="control-bar">
-      <button id="home-btn" type="button">Home</button>
-      <button id="back-btn" type="button">Zurück</button>
-      <span class="status-pill">
-        <span id="level-label">Bundesländer</span>
-        <span id="count-label"></span>
-      </span>
-    </div>
-
     <div class="info-panel" id="info-panel">
       <strong id="info-title">Bundesländer</strong>
       <span id="info-detail">Klicke auf ein Land</span>
+      <span id="count-label" class="info-count"></span>
     </div>
 
     <div class="loading hidden" id="loading">
@@ -326,13 +240,13 @@
       },
     };
 
-    const levelLabel = document.getElementById("level-label");
     const countLabel = document.getElementById("count-label");
     const infoTitle = document.getElementById("info-title");
     const infoDetail = document.getElementById("info-detail");
     const loadingEl = document.getElementById("loading");
-    const backBtn = document.getElementById("back-btn");
-    const homeBtn = document.getElementById("home-btn");
+    let homeControlButton;
+    let backControlButton;
+    let labelControlButton;
 
     const map = L.map("map", {
       minZoom: 5,
@@ -370,35 +284,10 @@
 
     const path = d3.geoPath().projection(projector);
 
-    const controlBar = document.querySelector(".control-bar");
     let labelsVisible = true;
     let isUserDraggingMap = false;
     let dragEndedAt = 0;
     const DRAG_CLICK_THRESHOLD = 250; // milliseconds to treat a recent drag as non-click
-
-    const labelToggle = document.createElement("div");
-    labelToggle.className = "label-toggle";
-    labelToggle.innerHTML = `
-      <span>Labels</span>
-      <label>
-        <input type="radio" name="labels-visibility" value="show" checked />
-        Anzeigen
-      </label>
-      <label>
-        <input type="radio" name="labels-visibility" value="hide" />
-        Ausblenden
-      </label>
-    `;
-    controlBar.appendChild(labelToggle);
-    const labelRadios = Array.from(labelToggle.querySelectorAll('input[name="labels-visibility"]'));
-    labelRadios.forEach((input) => {
-      input.addEventListener("change", () => {
-        labelsVisible = labelToggle.querySelector('input[name="labels-visibility"]:checked').value === "show";
-        updateLabelVisibility();
-      });
-    });
-
-    updateLabelVisibility();
 
     const cache = {};
     const topoSource = {};
@@ -421,22 +310,20 @@
       syncOverlay();
     });
 
-    homeBtn.addEventListener("click", () => {
-      history = [];
-      activeCode = null;
-      currentView = { level: "states", prefix: null, name: "Germany" };
-      loadView(currentView);
-    });
-
-    backBtn.addEventListener("click", () => {
-      if (!history.length) {
-        homeBtn.click();
-        return;
-      }
-      activeCode = null;
-      currentView = history.pop();
-      loadView(currentView, { skipHistory: true });
-    });
+    const toolbarControl = L.control({ position: "topleft" });
+    toolbarControl.onAdd = () => {
+      const container = L.DomUtil.create("div", "leaflet-bar custom-map-controls");
+      homeControlButton = createControlButton(container, "🏠", "Zur Startansicht");
+      backControlButton = createControlButton(container, "↩", "Eine Ebene zurück");
+      labelControlButton = createControlButton(container, "✓", "Labels ausblenden");
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+      return container;
+    };
+    toolbarControl.addTo(map);
+    bindToolbarEvents();
+    updateLabelToggleUI();
+    updateLabelVisibility();
 
     function codeFor(feature) {
       return String(feature.properties.RS || feature.properties.AGS || feature.properties.ID_1 || "");
@@ -448,8 +335,81 @@
 
     function restoreLevelInfo() {
       const meta = LEVELS[currentView.level];
-      infoTitle.textContent = meta.label;
+      infoTitle.textContent = formatViewTitle(meta, currentView);
       infoDetail.textContent = LEVELS[currentView.level].instruction;
+    }
+
+    function createControlButton(container, symbol, title) {
+      const button = L.DomUtil.create("a", "leaflet-control-button", container);
+      button.href = "#";
+      button.setAttribute("role", "button");
+      button.setAttribute("aria-label", title);
+      button.title = title;
+      button.innerHTML = `<span aria-hidden="true">${symbol}</span>`;
+      return button;
+    }
+
+    function bindToolbarEvents() {
+      if (homeControlButton) {
+        L.DomEvent.on(homeControlButton, "click", (event) => {
+          L.DomEvent.stop(event);
+          goHome();
+        });
+      }
+
+      if (backControlButton) {
+        L.DomEvent.on(backControlButton, "click", (event) => {
+          L.DomEvent.stop(event);
+          if (backControlButton.classList.contains("leaflet-disabled")) {
+            return;
+          }
+          if (!history.length) {
+            goHome();
+            return;
+          }
+          activeCode = null;
+          currentView = history.pop();
+          loadView(currentView, { skipHistory: true });
+        });
+      }
+
+      if (labelControlButton) {
+        L.DomEvent.on(labelControlButton, "click", (event) => {
+          L.DomEvent.stop(event);
+          labelsVisible = !labelsVisible;
+          updateLabelVisibility();
+          updateLabelToggleUI();
+        });
+      }
+    }
+
+    function goHome() {
+      history = [];
+      activeCode = null;
+      currentView = { level: "states", prefix: null, name: "Germany" };
+      loadView(currentView);
+    }
+
+    function setBackButtonDisabled(disabled) {
+      if (!backControlButton) return;
+      backControlButton.classList.toggle("leaflet-disabled", disabled);
+      backControlButton.setAttribute("aria-disabled", disabled ? "true" : "false");
+    }
+
+    function updateLabelToggleUI() {
+      if (!labelControlButton) return;
+      const labelTitle = labelsVisible ? "Labels ausblenden" : "Labels anzeigen";
+      labelControlButton.classList.toggle("toggle-active", labelsVisible);
+      labelControlButton.setAttribute("aria-pressed", labelsVisible ? "true" : "false");
+      labelControlButton.setAttribute("aria-label", labelTitle);
+      labelControlButton.title = labelTitle;
+    }
+
+    function formatViewTitle(meta, view) {
+      if (!view || !view.name || view.name === "Germany") {
+        return meta.label;
+      }
+      return `${meta.label} · ${view.name}`;
     }
 
     async function fetchFeatures(level) {
@@ -509,11 +469,14 @@
 
     function updateUI(view, count) {
       const meta = LEVELS[view.level];
-      levelLabel.textContent = `${meta.label}${view.name && view.name !== "Germany" ? ` · ${view.name}` : ""}`;
-      countLabel.textContent = `${count.toLocaleString()} ${count === 1 ? "Einheit" : "Einheiten"}`;
-      infoTitle.textContent = meta.label;
+      const title = formatViewTitle(meta, view);
+      infoTitle.textContent = title;
       infoDetail.textContent = meta.instruction;
-      backBtn.disabled = view.level === "states" && history.length === 0;
+      if (countLabel) {
+        countLabel.textContent = `${count.toLocaleString()} ${count === 1 ? "Einheit" : "Einheiten"}`;
+      }
+      setBackButtonDisabled(view.level === "states" && history.length === 0);
+      updateLabelToggleUI();
     }
 
     function drawFeatures(features) {
