@@ -819,12 +819,20 @@
     }
 
     function highlightFeature(code, active) {
-      labelLayer
+      const selection = labelLayer
         .selectAll(`g.label[data-code="${code}"]`)
         .classed('hovered', active)
         .classed('hidden', function () {
           return !labelsVisible && !active;
         });
+
+      if (active) {
+        selection.each(function () {
+          if (this.parentNode) {
+            this.parentNode.appendChild(this);
+          }
+        });
+      }
 
       updateLabelVisibility();
     }
