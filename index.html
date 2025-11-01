@@ -798,17 +798,33 @@
           const stripeWidth = Math.max(10, plateHeight * 0.3);
           const textSelection = plateGroup.select("text.plate-text")
             .style("font-size", `${baseFont}px`)
+            .attr("lengthAdjust", null)
+            .attr("textLength", null)
+            .style("letter-spacing", null)
             .text(plateTextValue);
-          let measuredTextWidth = plateTextValue.length ? plateTextValue.length * (baseFont * 0.72) : baseFont * 2;
+          const charCount = plateTextValue.length;
+          const approximateWidth = charCount
+            ? (charCount * baseFont * 0.88) + Math.max(charCount - 1, 0) * (baseFont * 0.18)
+            : baseFont * 2.6;
+          let measuredTextWidth = approximateWidth;
           const textNode = textSelection.node();
           if (textNode && typeof textNode.getComputedTextLength === "function") {
             const computed = textNode.getComputedTextLength();
-            if (computed && Number.isFinite(computed)) {
+            if (Number.isFinite(computed) && computed > 0) {
               measuredTextWidth = computed;
             }
           }
-          const contentPadding = Math.max(baseFont * 0.55, 12);
-          const contentWidth = Math.max(measuredTextWidth + contentPadding, plateHeight * 1.55);
+          const horizontalPadding = Math.max(baseFont * 0.45, 14);
+          const minContentWidth = plateHeight * 1.65;
+          const contentWidth = Math.max(measuredTextWidth + horizontalPadding * 2, minContentWidth);
+          const availableTextWidth = Math.max(contentWidth - horizontalPadding * 2, plateHeight);
+          if (measuredTextWidth > availableTextWidth) {
+            const adjustedLetterSpacing = Math.max(0.04, 0.1 - ((measuredTextWidth - availableTextWidth) / measuredTextWidth) * 0.06);
+            textSelection
+              .attr("lengthAdjust", "spacingAndGlyphs")
+              .attr("textLength", availableTextWidth)
+              .style("letter-spacing", `${adjustedLetterSpacing.toFixed(3)}em`);
+          }
           const plateWidth = stripeWidth + contentWidth;
           const plateRadius = plateHeight * 0.2;
 
