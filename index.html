@@ -124,6 +124,10 @@
       pointer-events: none;
     }
 
+    .custom-map-controls .leaflet-control-button.hidden-control {
+      display: none;
+    }
+
     .info-panel {
       position: absolute;
       bottom: 1.2rem;
@@ -225,7 +229,7 @@
         prefixLength: 2,
       },
       counties: {
-        file: "topojson/germany_counties.json",
+        file: "topojson/germany_counties_with_kfz_full.json",
         label: "Stadt-/Landkreise",
         instruction: "Klicke auf einen Kreis, um die Gemeinden anzuzeigen",
         next: "municipalities",
@@ -247,6 +251,12 @@
     let homeControlButton;
     let backControlButton;
     let labelControlButton;
+    let plateControlButton;
+    const COUNTY_LABEL_MODES = {
+      NAME: "name",
+      PLATE: "plate",
+    };
+    let countyLabelMode = COUNTY_LABEL_MODES.NAME;
 
     const map = L.map("map", {
       minZoom: 5,
@@ -316,6 +326,7 @@
       homeControlButton = createControlButton(container, "🏠", "Zur Startansicht");
       backControlButton = createControlButton(container, "↩", "Eine Ebene zurück");
       labelControlButton = createControlButton(container, "✓", "Labels ausblenden");
+      plateControlButton = createControlButton(container, "🚗", "Kfz-Kennzeichen anzeigen");
       L.DomEvent.disableClickPropagation(container);
       L.DomEvent.disableScrollPropagation(container);
       return container;
@@ -323,6 +334,7 @@
     toolbarControl.addTo(map);
     bindToolbarEvents();
     updateLabelToggleUI();
+    updatePlateToggleUI();
     updateLabelVisibility();
 
     function codeFor(feature) {
@@ -331,6 +343,46 @@
 
     function nameFor(feature) {
       return feature.properties.GEN || feature.properties.NAME || "Unbenannt";
+    }
+
+    function licensePlateFor(feature) {
+      const value = feature?.properties?.KFZ;
+      return value && String(value).trim().length ? String(value).trim() : "";
+    }
+
+    function labelTextFor(entry) {
+      if (!entry || !entry.feature) return "";
+      if (currentView.level === "counties" && countyLabelMode === COUNTY_LABEL_MODES.PLATE) {
+        return entry.licensePlate || entry.name;
+      }
+      return entry.name;
+    }
+
+    function infoContentFor(feature) {
+      const code = codeFor(feature);
+      const name = nameFor(feature);
+      if (currentView.level === "counties") {
+        const plate = licensePlateFor(feature);
+        if (countyLabelMode === COUNTY_LABEL_MODES.PLATE && plate) {
+          return {
+            title: plate,
+            detail: `${name} · Code: ${code}`,
+          };
+        }
+        const parts = [];
+        if (plate) {
+          parts.push(`KFZ: ${plate}`);
+        }
+        parts.push(`Code: ${code}`);
+        return {
+          title: name,
+          detail: parts.join(" · "),
+        };
+      }
+      return {
+        title: name,
+        detail: `Code: ${code}`,
+      };
     }
 
     function restoreLevelInfo() {
@@ -381,6 +433,21 @@
           updateLabelToggleUI();
         });
       }
+
+      if (plateControlButton) {
+        L.DomEvent.on(plateControlButton, "click", (event) => {
+          L.DomEvent.stop(event);
+          if (currentView.level !== "counties") {
+            return;
+          }
+          countyLabelMode = countyLabelMode === COUNTY_LABEL_MODES.NAME
+            ? COUNTY_LABEL_MODES.PLATE
+            : COUNTY_LABEL_MODES.NAME;
+          updatePlateToggleUI();
+          drawFeatures(displayedFeatures);
+          restoreLevelInfo();
+        });
+      }
     }
 
     function goHome() {
@@ -403,6 +470,25 @@
       labelControlButton.setAttribute("aria-pressed", labelsVisible ? "true" : "false");
       labelControlButton.setAttribute("aria-label", labelTitle);
       labelControlButton.title = labelTitle;
+    }
+
+    function updatePlateToggleUI() {
+      if (!plateControlButton) return;
+      const isCountyLevel = currentView.level === "counties";
+      plateControlButton.classList.toggle("hidden-control", !isCountyLevel);
+      if (!isCountyLevel) {
+        plateControlButton.classList.remove("toggle-active");
+        plateControlButton.removeAttribute("aria-pressed");
+        plateControlButton.setAttribute("aria-label", "Kfz-Kennzeichen anzeigen");
+        plateControlButton.title = "Kfz-Kennzeichen anzeigen";
+        return;
+      }
+      const showingPlates = countyLabelMode === COUNTY_LABEL_MODES.PLATE;
+      const plateTitle = showingPlates ? "Landkreisnamen anzeigen" : "Kfz-Kennzeichen anzeigen";
+      plateControlButton.classList.toggle("toggle-active", showingPlates);
+      plateControlButton.setAttribute("aria-pressed", showingPlates ? "true" : "false");
+      plateControlButton.setAttribute("aria-label", plateTitle);
+      plateControlButton.title = plateTitle;
     }
 
     function formatViewTitle(meta, view) {
@@ -477,6 +563,7 @@
       }
       setBackButtonDisabled(view.level === "states" && history.length === 0);
       updateLabelToggleUI();
+      updatePlateToggleUI();
     }
 
     function drawFeatures(features) {
@@ -502,8 +589,9 @@
           handleFeatureClick(feature);
         })
         .on("mouseenter", (_, feature) => {
-          infoTitle.textContent = nameFor(feature);
-          infoDetail.textContent = `Code: ${codeFor(feature)}`;
+          const info = infoContentFor(feature);
+          infoTitle.textContent = info.title;
+          infoDetail.textContent = info.detail;
           highlightFeature(codeFor(feature), true);
         })
         .on("mouseleave", (_, feature) => {
@@ -517,6 +605,7 @@
             feature,
             code: codeFor(feature),
             name: nameFor(feature),
+            licensePlate: licensePlateFor(feature),
           }))
         : [];
 
@@ -529,8 +618,9 @@
         .append("text")
         .attr("class", "label")
         .on("mouseenter", (_, d) => {
-          infoTitle.textContent = d.name;
-          infoDetail.textContent = `Code: ${d.code}`;
+          const info = infoContentFor(d.feature);
+          infoTitle.textContent = info.title;
+          infoDetail.textContent = info.detail;
           highlightFeature(d.code, true);
         })
         .on("mouseleave", (_, d) => {
@@ -554,7 +644,7 @@
           .attr("x", centroid[0])
           .attr("y", centroid[1] - radius - 2)
           .style("font-size", `${fontSize}px`)
-          .text(d.name);
+          .text(labelTextFor(d));
       });
 
       syncOverlay();
@@ -643,7 +733,8 @@
           .attr("data-code", d.code)
           .attr("x", centroid[0])
           .attr("y", centroid[1] - radius - 2)
-          .style("font-size", `${fontSize}px`);
+          .style("font-size", `${fontSize}px`)
+          .text(labelTextFor(d));
       });
 
       updateLabelVisibility();
