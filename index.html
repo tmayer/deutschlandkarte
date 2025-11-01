@@ -75,11 +75,7 @@
       stroke: var(--accent);
     }
 
-    svg.overlay .feature.selected {
-      fill: rgba(248, 250, 252, 0.35);
-      stroke: var(--text-primary);
-    }
-
+    svg.overlay .feature.selected,
     svg.overlay .feature.selected.municipality-level {
       fill: rgba(248, 113, 113, 0.35);
       stroke: #fecaca;
@@ -411,6 +407,17 @@
     function licensePlateFor(feature) {
       const value = feature?.properties?.KFZ;
       return value && String(value).trim().length ? String(value).trim() : "";
+    }
+
+    function isCoarsePointerDevice() {
+      if (window.matchMedia) {
+        try {
+          if (window.matchMedia("(pointer: coarse)").matches) {
+            return true;
+          }
+        } catch (error) {}
+      }
+      return navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
     }
 
     function infoContentFor(feature) {
@@ -898,6 +905,22 @@
       const nextLevel = meta.next;
       const code = codeFor(feature);
       const name = nameFor(feature);
+
+      if (isCoarsePointerDevice() && currentView.level === "counties" && nextLevel) {
+        if (activeCode !== code) {
+          const previousCode = activeCode;
+          activeCode = code;
+          const info = infoContentFor(feature);
+          infoTitle.textContent = info.title;
+          infoDetail.textContent = info.detail;
+          if (previousCode && previousCode !== code) {
+            highlightFeature(previousCode, false);
+          }
+          highlightFeature(code, true);
+          syncOverlay();
+          return;
+        }
+      }
 
       if (!nextLevel) {
         const previousCode = activeCode;
