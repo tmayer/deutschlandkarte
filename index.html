@@ -90,19 +90,82 @@
       pointer-events: none;
     }
 
-    svg.overlay text.label {
+    svg.overlay .label {
+      pointer-events: auto;
+      transition: opacity 0.15s ease;
+    }
+
+    svg.overlay .label.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    svg.overlay .label-name {
       fill: var(--text-primary);
       stroke: rgba(2, 6, 23, 0.7);
       stroke-width: 3;
       paint-order: stroke fill;
       font-weight: 600;
       text-anchor: middle;
-      pointer-events: auto;
-      transition: fill 0.15s ease, opacity 0.15s ease;
+      dominant-baseline: middle;
+      transition: fill 0.15s ease, stroke 0.15s ease;
     }
 
-    svg.overlay text.label.hidden {
-      opacity: 0;
+    svg.overlay .label.plate-mode .label-name {
+      display: none;
+    }
+
+    svg.overlay .label-plate {
+      display: none;
+    }
+
+    svg.overlay .label.plate-mode .label-plate {
+      display: block;
+    }
+
+    svg.overlay .label-plate rect.plate-bg {
+      fill: #f8fafc;
+      stroke: none;
+    }
+
+    svg.overlay .label-plate rect.plate-stripe {
+      fill: #003399;
+      stroke: none;
+    }
+
+    svg.overlay .label-plate rect.plate-outline {
+      fill: none;
+      stroke: rgba(15, 23, 42, 0.7);
+      stroke-width: 2;
+      stroke-linejoin: round;
+    }
+
+    svg.overlay .label-plate text {
+      dominant-baseline: middle;
+    }
+
+    svg.overlay .label-plate text.plate-text {
+      fill: #0f172a;
+      font-weight: 700;
+      text-anchor: middle;
+      letter-spacing: 0.1em;
+    }
+
+    svg.overlay .label-plate text.plate-eu,
+    svg.overlay .label-plate text.plate-d {
+      fill: #ffffff;
+      text-anchor: middle;
+      font-weight: 600;
+    }
+
+    svg.overlay .label.hovered .label-name {
+      fill: #1d4ed8;
+      stroke: #ffffff;
+    }
+
+    svg.overlay .label.hovered .label-plate rect.plate-outline {
+      stroke: #2563eb;
+      stroke-width: 3;
     }
 
     .custom-map-controls .leaflet-control-button {
@@ -348,14 +411,6 @@
     function licensePlateFor(feature) {
       const value = feature?.properties?.KFZ;
       return value && String(value).trim().length ? String(value).trim() : "";
-    }
-
-    function labelTextFor(entry) {
-      if (!entry || !entry.feature) return "";
-      if (currentView.level === "counties" && countyLabelMode === COUNTY_LABEL_MODES.PLATE) {
-        return entry.licensePlate || entry.name;
-      }
-      return entry.name;
     }
 
     function infoContentFor(feature) {
@@ -609,14 +664,29 @@
           }))
         : [];
 
-      const labels = labelLayer.selectAll("text.label").data(labelData, (d) => d.code);
+      const labels = labelLayer.selectAll("g.label").data(labelData, (d) => d.code);
 
       labels.exit().remove();
 
       const labelsEnter = labels
         .enter()
-        .append("text")
+        .append("g")
         .attr("class", "label")
+        .call((selection) => {
+          selection.append("text").attr("class", "label-name");
+          const plate = selection.append("g").attr("class", "label-plate");
+          plate.append("rect").attr("class", "plate-bg");
+          plate.append("rect").attr("class", "plate-stripe");
+          plate.append("rect").attr("class", "plate-outline");
+          plate.append("text").attr("class", "plate-eu").text("🇪🇺");
+          plate.append("text").attr("class", "plate-d").text("D");
+          plate.append("text").attr("class", "plate-text");
+        });
+
+      const labelsMerged = labelsEnter.merge(labels);
+
+      labelsMerged
+        .attr("data-code", (d) => d.code)
         .on("mouseenter", (_, d) => {
           const info = infoContentFor(d.feature);
           infoTitle.textContent = info.title;
@@ -632,22 +702,98 @@
           handleFeatureClick(d.feature);
         });
 
-      const zoom = map.getZoom();
+      syncOverlay();
+    }
 
-      labelsEnter.merge(labels).each(function (d) {
+    function isPlateModeActive() {
+      return currentView.level === "counties" && countyLabelMode === COUNTY_LABEL_MODES.PLATE;
+    }
+
+    function refreshLabels() {
+      const zoom = map.getZoom();
+      const plateModeActive = isPlateModeActive();
+
+      labelLayer.selectAll("g.label").each(function (d) {
+        const group = d3.select(this);
         const centroid = path.centroid(d.feature);
         const fontSize = fontSizeFor(d.feature, currentView.level, zoom);
         const radius = anchorRadiusFor(currentView.level);
+        const labelHasPlate = Boolean(d.licensePlate);
+        const plateVisible = plateModeActive && labelHasPlate;
 
-        d3.select(this)
+        group
           .attr("data-code", d.code)
-          .attr("x", centroid[0])
-          .attr("y", centroid[1] - radius - 2)
-          .style("font-size", `${fontSize}px`)
-          .text(labelTextFor(d));
-      });
+          .attr("transform", `translate(${centroid[0]}, ${centroid[1] - radius - 2})`)
+          .classed("plate-mode", plateVisible)
+          .classed("name-mode", !plateVisible);
 
-      syncOverlay();
+        group.select("text.label-name")
+          .style("font-size", `${fontSize}px`)
+          .text(d.name);
+
+        const plateGroup = group.select("g.label-plate");
+        if (!plateGroup.empty()) {
+          const plateTextValue = d.licensePlate || d.name;
+          const baseFont = Math.max(12, fontSize * 0.9);
+          const plateHeight = Math.max(24, baseFont * 1.8);
+          const stripeWidth = Math.max(12, plateHeight * 0.32);
+          const textSelection = plateGroup.select("text.plate-text")
+            .style("font-size", `${baseFont}px`)
+            .text(plateTextValue);
+          let measuredTextWidth = plateTextValue.length ? plateTextValue.length * (baseFont * 0.72) : baseFont * 2;
+          const textNode = textSelection.node();
+          if (textNode && typeof textNode.getComputedTextLength === "function") {
+            const computed = textNode.getComputedTextLength();
+            if (computed && Number.isFinite(computed)) {
+              measuredTextWidth = computed;
+            }
+          }
+          const contentPadding = Math.max(baseFont * 0.6, 14);
+          const contentWidth = Math.max(measuredTextWidth + contentPadding, plateHeight * 1.55);
+          const plateWidth = stripeWidth + contentWidth;
+          const plateRadius = plateHeight * 0.22;
+
+          plateGroup.attr("transform", `translate(${-plateWidth / 2}, ${-plateHeight / 2})`);
+
+          plateGroup.select("rect.plate-bg")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", plateWidth)
+            .attr("height", plateHeight)
+            .attr("rx", plateRadius)
+            .attr("ry", plateRadius);
+
+          plateGroup.select("rect.plate-stripe")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", stripeWidth)
+            .attr("height", plateHeight)
+            .attr("rx", plateRadius)
+            .attr("ry", plateRadius);
+
+          plateGroup.select("rect.plate-outline")
+            .attr("x", 0)
+            .attr("y", 0)
+            .attr("width", plateWidth)
+            .attr("height", plateHeight)
+            .attr("rx", plateRadius)
+            .attr("ry", plateRadius);
+
+          plateGroup.select("text.plate-text")
+            .attr("x", stripeWidth + (plateWidth - stripeWidth) / 2)
+            .attr("y", plateHeight / 2);
+
+          plateGroup.select("text.plate-eu")
+            .attr("x", stripeWidth / 2)
+            .attr("y", plateHeight * 0.35)
+            .style("font-size", `${plateHeight * 0.42}px`);
+
+          plateGroup.select("text.plate-d")
+            .attr("x", stripeWidth / 2)
+            .attr("y", plateHeight * 0.75)
+            .style("font-size", `${plateHeight * 0.38}px`);
+        }
+      });
     }
 
     function labelArea(feature) {
@@ -674,15 +820,10 @@
 
     function highlightFeature(code, active) {
       labelLayer
-        .selectAll(`text.label[data-code="${code}"]`)
+        .selectAll(`g.label[data-code="${code}"]`)
         .classed('hovered', active)
-        .classed('hidden', !labelsVisible && !active)
-        .style("fill", active ? "#1d4ed8" : "var(--text-primary)")
-        .style("stroke", active ? "#ffffff" : "rgba(2, 6, 23, 0.7)")
-        .each(function (d) {
-          if (!d || !d.feature) return;
-          const fontSize = fontSizeFor(d.feature, currentView.level, map.getZoom());
-          d3.select(this).style("font-size", `${fontSize}px`);
+        .classed('hidden', function () {
+          return !labelsVisible && !active;
         });
 
       updateLabelVisibility();
@@ -690,7 +831,7 @@
 
     function updateLabelVisibility() {
       labelLayer
-        .selectAll('text.label')
+        .selectAll('g.label')
         .classed('hidden', function () {
           return !labelsVisible && !d3.select(this).classed('hovered');
         });
@@ -722,20 +863,7 @@
         .classed("selected", (d) => codeFor(d) === activeCode)
         .classed("municipality-level", currentView.level === "municipalities");
 
-      const zoom = map.getZoom();
-
-      labelLayer.selectAll("text.label").each(function (d) {
-        const centroid = path.centroid(d.feature);
-        const fontSize = fontSizeFor(d.feature, currentView.level, zoom);
-        const radius = anchorRadiusFor(currentView.level);
-
-        d3.select(this)
-          .attr("data-code", d.code)
-          .attr("x", centroid[0])
-          .attr("y", centroid[1] - radius - 2)
-          .style("font-size", `${fontSize}px`)
-          .text(labelTextFor(d));
-      });
+      refreshLabels();
 
       updateLabelVisibility();
     }
