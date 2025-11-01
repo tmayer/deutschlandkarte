@@ -223,12 +223,6 @@
       line-height: 1.4;
     }
 
-    .info-panel .info-count {
-      color: var(--text-secondary);
-      font-size: 0.8rem;
-      opacity: 0.85;
-    }
-
     .loading {
       position: absolute;
       inset: 0;
@@ -280,7 +274,6 @@
     <div class="info-panel" id="info-panel">
       <strong id="info-title">Bundesländer</strong>
       <span id="info-detail">Klicke auf ein Land</span>
-      <span id="count-label" class="info-count"></span>
     </div>
 
     <div class="loading hidden" id="loading">
@@ -317,7 +310,6 @@
     };
 
     const infoPanel = document.getElementById("info-panel");
-    const countLabel = document.getElementById("count-label");
     const infoTitle = document.getElementById("info-title");
     const infoDetail = document.getElementById("info-detail");
     const loadingEl = document.getElementById("loading");
@@ -442,29 +434,23 @@
     }
 
     function infoContentFor(feature) {
-      const code = codeFor(feature);
       const name = nameFor(feature);
       if (currentView.level === "counties") {
         const plate = licensePlateFor(feature);
         if (countyLabelMode === COUNTY_LABEL_MODES.PLATE && plate) {
           return {
             title: plate,
-            detail: `${name} · Code: ${code}`,
+            detail: name,
           };
         }
-        const parts = [];
-        if (plate) {
-          parts.push(`KFZ: ${plate}`);
-        }
-        parts.push(`Code: ${code}`);
         return {
           title: name,
-          detail: parts.join(" · "),
+          detail: plate ? `KFZ: ${plate}` : "",
         };
       }
       return {
         title: name,
-        detail: `Code: ${code}`,
+        detail: "",
       };
     }
 
@@ -672,9 +658,6 @@
       const title = formatViewTitle(meta, view);
       infoTitle.textContent = title;
       infoDetail.textContent = meta.instruction;
-      if (countLabel) {
-        countLabel.textContent = `${count.toLocaleString()} ${count === 1 ? "Einheit" : "Einheiten"}`;
-      }
       setBackButtonDisabled(view.level === "states" && history.length === 0);
       updateLabelToggleUI();
       updatePlateToggleUI();
@@ -994,7 +977,7 @@
         const previousCode = activeCode;
         activeCode = code;
         infoTitle.textContent = name;
-        infoDetail.textContent = `Administrative code: ${code}`;
+        infoDetail.textContent = "";
         if (previousCode && previousCode !== code) {
           highlightFeature(previousCode, false);
         }
