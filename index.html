@@ -128,7 +128,7 @@
       stroke: none;
     }
 
-    svg.overlay .label-plate rect.plate-stripe {
+    svg.overlay .label-plate .plate-stripe {
       fill: #003399;
       stroke: none;
     }
@@ -676,7 +676,7 @@
           selection.append("text").attr("class", "label-name");
           const plate = selection.append("g").attr("class", "label-plate");
           plate.append("rect").attr("class", "plate-bg");
-          plate.append("rect").attr("class", "plate-stripe");
+          plate.append("path").attr("class", "plate-stripe");
           plate.append("rect").attr("class", "plate-outline");
           plate.append("text").attr("class", "plate-eu").text("🇪🇺");
           plate.append("text").attr("class", "plate-d").text("D");
@@ -734,9 +734,9 @@
         const plateGroup = group.select("g.label-plate");
         if (!plateGroup.empty()) {
           const plateTextValue = d.licensePlate || d.name;
-          const baseFont = Math.max(12, fontSize * 0.9);
-          const plateHeight = Math.max(24, baseFont * 1.8);
-          const stripeWidth = Math.max(12, plateHeight * 0.32);
+          const baseFont = Math.max(11, fontSize * 0.82);
+          const plateHeight = Math.max(20, baseFont * 1.55);
+          const stripeWidth = Math.max(10, plateHeight * 0.3);
           const textSelection = plateGroup.select("text.plate-text")
             .style("font-size", `${baseFont}px`)
             .text(plateTextValue);
@@ -748,10 +748,10 @@
               measuredTextWidth = computed;
             }
           }
-          const contentPadding = Math.max(baseFont * 0.6, 14);
+          const contentPadding = Math.max(baseFont * 0.55, 12);
           const contentWidth = Math.max(measuredTextWidth + contentPadding, plateHeight * 1.55);
           const plateWidth = stripeWidth + contentWidth;
-          const plateRadius = plateHeight * 0.22;
+          const plateRadius = plateHeight * 0.2;
 
           plateGroup.attr("transform", `translate(${-plateWidth / 2}, ${-plateHeight / 2})`);
 
@@ -763,13 +763,16 @@
             .attr("rx", plateRadius)
             .attr("ry", plateRadius);
 
-          plateGroup.select("rect.plate-stripe")
-            .attr("x", 0)
-            .attr("y", 0)
-            .attr("width", stripeWidth)
-            .attr("height", plateHeight)
-            .attr("rx", plateRadius)
-            .attr("ry", plateRadius);
+          plateGroup.select("path.plate-stripe")
+            .attr("d", [
+              `M${stripeWidth},0`,
+              `H${plateRadius}`,
+              `A${plateRadius},${plateRadius} 0 0 0 0,${plateRadius}`,
+              `V${plateHeight - plateRadius}`,
+              `A${plateRadius},${plateRadius} 0 0 0 ${plateRadius},${plateHeight}`,
+              `H${stripeWidth}`,
+              "Z"
+            ].join(" "));
 
           plateGroup.select("rect.plate-outline")
             .attr("x", 0)
