@@ -204,6 +204,14 @@
       z-index: 1100;
     }
 
+    .info-panel.hidden-panel {
+      display: none;
+    }
+
+    .info-panel.show-on-mobile {
+      display: flex;
+    }
+
     .info-panel strong {
       color: var(--text-primary);
       font-size: 1rem;
@@ -256,7 +264,12 @@
       .info-panel {
         display: none;
       }
+
+      .info-panel.show-on-mobile {
+        display: flex;
+      }
     }
+
   </style>
 </head>
 <body>
@@ -303,6 +316,7 @@
       },
     };
 
+    const infoPanel = document.getElementById("info-panel");
     const countLabel = document.getElementById("count-label");
     const infoTitle = document.getElementById("info-title");
     const infoDetail = document.getElementById("info-detail");
@@ -311,6 +325,8 @@
     let backControlButton;
     let labelControlButton;
     let plateControlButton;
+    let infoControlButton;
+    let infoPanelVisible = true;
     const COUNTY_LABEL_MODES = {
       NAME: "name",
       PLATE: "plate",
@@ -377,6 +393,7 @@
     window.addEventListener("resize", () => {
       map.invalidateSize();
       syncOverlay();
+      updateInfoPanelVisibility();
     });
 
     const toolbarControl = L.control({ position: "topleft" });
@@ -386,6 +403,7 @@
       backControlButton = createControlButton(container, "↩", "Eine Ebene zurück");
       labelControlButton = createControlButton(container, "✓", "Labels ausblenden");
       plateControlButton = createControlButton(container, "🚗", "Kfz-Kennzeichen anzeigen");
+      infoControlButton = createControlButton(container, "i", "Information ausblenden");
       L.DomEvent.disableClickPropagation(container);
       L.DomEvent.disableScrollPropagation(container);
       return container;
@@ -395,6 +413,9 @@
     updateLabelToggleUI();
     updatePlateToggleUI();
     updateLabelVisibility();
+    infoPanelVisible = window.innerWidth > 640;
+    updateInfoPanelVisibility();
+    updateInfoToggleUI();
 
     function codeFor(feature) {
       return String(feature.properties.RS || feature.properties.AGS || feature.properties.ID_1 || "");
@@ -510,6 +531,15 @@
           restoreLevelInfo();
         });
       }
+
+      if (infoControlButton) {
+        L.DomEvent.on(infoControlButton, "click", (event) => {
+          L.DomEvent.stop(event);
+          infoPanelVisible = !infoPanelVisible;
+          updateInfoPanelVisibility();
+          updateInfoToggleUI();
+        });
+      }
     }
 
     function goHome() {
@@ -551,6 +581,28 @@
       plateControlButton.setAttribute("aria-pressed", showingPlates ? "true" : "false");
       plateControlButton.setAttribute("aria-label", plateTitle);
       plateControlButton.title = plateTitle;
+    }
+
+    function updateInfoPanelVisibility() {
+      if (!infoPanel) return;
+      infoPanel.classList.toggle("hidden-panel", !infoPanelVisible);
+      if (!infoPanelVisible) {
+        infoPanel.classList.remove("show-on-mobile");
+        return;
+      }
+      const isSmallScreen = window.matchMedia
+        ? window.matchMedia("(max-width: 640px)").matches
+        : window.innerWidth <= 640;
+      infoPanel.classList.toggle("show-on-mobile", isSmallScreen);
+    }
+
+    function updateInfoToggleUI() {
+      if (!infoControlButton) return;
+      const infoTitleText = infoPanelVisible ? "Information ausblenden" : "Information anzeigen";
+      infoControlButton.classList.toggle("toggle-active", infoPanelVisible);
+      infoControlButton.setAttribute("aria-pressed", infoPanelVisible ? "true" : "false");
+      infoControlButton.setAttribute("aria-label", infoTitleText);
+      infoControlButton.title = infoTitleText;
     }
 
     function formatViewTitle(meta, view) {
