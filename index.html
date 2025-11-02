@@ -294,7 +294,7 @@
         prefixLength: 2,
       },
       counties: {
-        file: "topojson/germany_counties_with_kfz_full.json",
+        file: "topojson/germany_counties_with_kfz_full_v2.json",
         label: "Stadt-/Landkreise",
         instruction: "Klicke auf einen Kreis, um die Gemeinden anzuzeigen",
         next: "municipalities",
@@ -420,6 +420,15 @@
     function licensePlateFor(feature) {
       const value = feature?.properties?.KFZ;
       return value && String(value).trim().length ? String(value).trim() : "";
+    }
+
+    function primaryLicensePlateFor(feature) {
+      const fullValue = licensePlateFor(feature);
+      if (!fullValue) {
+        return "";
+      }
+      const [primary] = fullValue.split(/\s+/);
+      return primary || "";
     }
 
     function isCoarsePointerDevice() {
@@ -702,7 +711,7 @@
             feature,
             code: codeFor(feature),
             name: nameFor(feature),
-            licensePlate: licensePlateFor(feature),
+            licensePlate: primaryLicensePlateFor(feature),
           }))
         : [];
 
