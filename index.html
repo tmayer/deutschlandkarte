@@ -171,6 +171,7 @@
       font-size: 1.05rem;
       font-weight: 600;
       color: #0f172a;
+      border-color: rgba(148, 163, 184, 0.35);
     }
 
     .custom-map-controls .leaflet-control-button.toggle-active {
@@ -181,6 +182,7 @@
     .custom-map-controls .leaflet-control-button.leaflet-disabled {
       color: rgba(15, 23, 42, 0.35);
       pointer-events: none;
+      border-color: rgba(148, 163, 184, 0.35);
     }
 
     .custom-map-controls .leaflet-control-button.hidden-control {
@@ -393,9 +395,9 @@
       const container = L.DomUtil.create("div", "leaflet-bar custom-map-controls");
       homeControlButton = createControlButton(container, "🏠", "Zur Startansicht");
       backControlButton = createControlButton(container, "↩", "Eine Ebene zurück");
-      labelControlButton = createControlButton(container, "✓", "Labels ausblenden");
-      plateControlButton = createControlButton(container, "🚗", "Kfz-Kennzeichen anzeigen");
-      infoControlButton = createControlButton(container, "i", "Information ausblenden");
+      labelControlButton = createControlButton(container, "🏷️", "Labels ausblenden");
+      plateControlButton = createControlButton(container, "🚘", "Kfz-Kennzeichen anzeigen");
+      infoControlButton = createControlButton(container, "ℹ️", "Information ausblenden");
       L.DomEvent.disableClickPropagation(container);
       L.DomEvent.disableScrollPropagation(container);
       return container;
