@@ -287,6 +287,7 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
   <script>
+    const WIKIPEDIA_BASE_URL = "https://de.wikipedia.org/wiki/";
     const LEVELS = {
       states: {
         file: "topojson/germany_states.json",
@@ -439,8 +440,14 @@
       if (value == null) {
         return "";
       }
-      const href = String(value).trim();
-      return href ? href : "";
+      const slug = String(value).trim();
+      if (!slug) {
+        return "";
+      }
+      if (/^https?:\/\//i.test(slug)) {
+        return slug;
+      }
+      return `${WIKIPEDIA_BASE_URL}${slug}`;
     }
 
     function openWikipediaTab(link) {
