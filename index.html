@@ -303,7 +303,7 @@
         prefixLength: 5,
       },
       municipalities: {
-        file: "topojson/germany_municipalities.json",
+        file: "topojson/germany_municipalities_with_wiki.json",
         label: "Gemeinden",
         instruction: "Klicke zurück, um eine Ebene höher zu kommen",
         next: null,
@@ -411,12 +411,45 @@
     updateInfoPanelVisibility();
     updateInfoToggleUI();
 
+    if (infoPanel) {
+      ["click", "pointerdown", "pointerup", "touchstart", "touchend"].forEach((type) => {
+        infoPanel.addEventListener(
+          type,
+          (event) => {
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === "function") {
+              event.stopImmediatePropagation();
+            }
+          },
+          { passive: true }
+        );
+      });
+    }
+
     function codeFor(feature) {
       return String(feature.properties.RS || feature.properties.AGS || feature.properties.ID_1 || "");
     }
 
     function nameFor(feature) {
       return feature.properties.GEN || feature.properties.NAME || "Unbenannt";
+    }
+
+    function wikipediaLinkFor(feature) {
+      const value = feature?.properties?.WI;
+      if (value == null) {
+        return "";
+      }
+      const href = String(value).trim();
+      return href ? href : "";
+    }
+
+    function openWikipediaTab(link) {
+      const href = typeof link === "string" ? link.trim() : "";
+      if (!href) return;
+      const newWindow = window.open(href, "_blank", "noopener,noreferrer");
+      if (newWindow && typeof newWindow.focus === "function") {
+        newWindow.focus();
+      }
     }
 
     function licensePlateFor(feature) {
@@ -452,23 +485,33 @@
           return {
             title: plate,
             detail: name,
+            link: "",
           };
         }
         return {
           title: name,
           detail: plate ? `KFZ: ${plate}` : "",
+          link: "",
+        };
+      }
+      if (currentView.level === "municipalities") {
+        return {
+          title: name,
+          detail: "",
+          link: wikipediaLinkFor(feature),
         };
       }
       return {
         title: name,
         detail: "",
+        link: "",
       };
     }
 
     function restoreLevelInfo() {
       const meta = LEVELS[currentView.level];
-      infoTitle.textContent = formatViewTitle(meta, currentView);
-      infoDetail.textContent = LEVELS[currentView.level].instruction;
+      setInfoTitle(formatViewTitle(meta, currentView));
+      setInfoDetail(meta.instruction);
     }
 
     function createControlButton(container, symbol, title) {
@@ -609,6 +652,19 @@
       return `${meta.label} · ${view.name}`;
     }
 
+    function setInfoTitle(title) {
+      const text = title != null ? String(title) : "";
+      infoTitle.textContent = text;
+    }
+
+    function setInfoDetail(detail) {
+      const text = detail != null ? String(detail) : "";
+      infoDetail.textContent = "";
+      if (text.trim().length) {
+        infoDetail.appendChild(document.createTextNode(text));
+      }
+    }
+
     async function fetchFeatures(level) {
       if (!cache[level]) {
         const response = await fetch(LEVELS[level].file);
@@ -655,10 +711,11 @@
         fitToFeatures(filtered);
       } catch (error) {
         console.error(error);
-        infoTitle.textContent = "Data unavailable";
-        infoDetail.textContent = error instanceof Error
+        setInfoTitle("Data unavailable");
+        const message = error instanceof Error
           ? `${error.message} Refresh the page or verify the TopoJSON files.`
           : "Refresh the page or verify the TopoJSON files.";
+        setInfoDetail(message);
       } finally {
         showLoading(false);
       }
@@ -667,8 +724,8 @@
     function updateUI(view, count) {
       const meta = LEVELS[view.level];
       const title = formatViewTitle(meta, view);
-      infoTitle.textContent = title;
-      infoDetail.textContent = meta.instruction;
+      setInfoTitle(title);
+      setInfoDetail(meta.instruction);
       setBackButtonDisabled(view.level === "states" && history.length === 0);
       updateLabelToggleUI();
       updatePlateToggleUI();
@@ -694,13 +751,14 @@
         .classed("municipality-level", isMunicipalityLevel)
         .on("click", (event, feature) => {
           event.stopPropagation();
-          handleFeatureClick(feature);
+          handleFeatureClick(feature, event);
         })
         .on("mouseenter", (_, feature) => {
+          const code = codeFor(feature);
           const info = infoContentFor(feature);
-          infoTitle.textContent = info.title;
-          infoDetail.textContent = info.detail;
-          highlightFeature(codeFor(feature), true);
+          setInfoTitle(info.title, info.link);
+          setInfoDetail(info.detail);
+          highlightFeature(code, true);
         })
         .on("mouseleave", (_, feature) => {
           restoreLevelInfo();
@@ -742,8 +800,8 @@
         .attr("data-code", (d) => d.code)
         .on("mouseenter", (_, d) => {
           const info = infoContentFor(d.feature);
-          infoTitle.textContent = info.title;
-          infoDetail.textContent = info.detail;
+          setInfoTitle(info.title, info.link);
+          setInfoDetail(info.detail);
           highlightFeature(d.code, true);
         })
         .on("mouseleave", (_, d) => {
@@ -752,7 +810,7 @@
         })
         .on("click", (event, d) => {
           event.stopPropagation();
-          handleFeatureClick(d.feature);
+          handleFeatureClick(d.feature, event);
         });
 
       syncOverlay();
@@ -958,7 +1016,7 @@
       map.fitBounds(L.latLngBounds(sw, ne), { padding });
     }
 
-    function handleFeatureClick(feature) {
+    function handleFeatureClick(feature, event) {
       const now = performance.now();
       if (isUserDraggingMap || (dragEndedAt && now - dragEndedAt < DRAG_CLICK_THRESHOLD)) {
         return;
@@ -967,14 +1025,15 @@
       const nextLevel = meta.next;
       const code = codeFor(feature);
       const name = nameFor(feature);
+      const pointerIsCoarse = isCoarsePointerDevice();
 
-      if (isCoarsePointerDevice() && currentView.level === "counties" && nextLevel) {
+      if (pointerIsCoarse && currentView.level === "counties" && nextLevel) {
         if (activeCode !== code) {
           const previousCode = activeCode;
           activeCode = code;
           const info = infoContentFor(feature);
-          infoTitle.textContent = info.title;
-          infoDetail.textContent = info.detail;
+          setInfoTitle(info.title, info.link);
+          setInfoDetail(info.detail);
           if (previousCode && previousCode !== code) {
             highlightFeature(previousCode, false);
           }
@@ -985,15 +1044,32 @@
       }
 
       if (!nextLevel) {
+        const wikiLink = wikipediaLinkFor(feature);
+        const wasActive = activeCode === code;
         const previousCode = activeCode;
+
         activeCode = code;
-        infoTitle.textContent = name;
-        infoDetail.textContent = "";
+        const info = infoContentFor(feature);
+        setInfoTitle(info.title, info.link);
+        setInfoDetail(info.detail);
         if (previousCode && previousCode !== code) {
           highlightFeature(previousCode, false);
         }
         highlightFeature(code, true);
         syncOverlay();
+
+        if (!wikiLink) {
+          return;
+        }
+
+        if (pointerIsCoarse) {
+          if (wasActive) {
+            openWikipediaTab(wikiLink);
+          }
+          return;
+        }
+
+        openWikipediaTab(wikiLink);
         return;
       }
 
